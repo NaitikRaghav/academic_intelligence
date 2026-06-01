@@ -1,20 +1,22 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/auth/auth_wrapper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Core Constants
 import 'core/constants/colors.dart';
 
+// Screens
+import 'screens/auth/auth_wrapper.dart';
 
-
-import 'screens/shared/ai_chat_screen.dart';
-import 'screens/teacher/teacher_dashboard.dart';
-import '../../screens/auth/login_screen.dart';
-import 'screens/student/student_dashboard.dart';
 void main() async {
   // 1. Ensure Flutter bindings are ready before doing any async setup
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. We will initialize Firebase right here in the next steps
-  // await Firebase.initializeApp();
+  // 2. 🟢 Ignite the Supabase Backend!
+  await Supabase.initialize(
+    url: 'https://sceyulspbddaursbkjcx.supabase.co', // 👈 Your backend partner will paste the URL here
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjZXl1bHNwYmRkYXVyc2JramN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NjE1NTMsImV4cCI6MjA5MjIzNzU1M30.K3AVg4X0ojYl8iFVIIRcxIACwX83x3VcS3HDCw4JAkM', // 👈 Your backend partner will paste the Anon Key here
+  );
 
   // 3. Boot up the app wrapped in ProviderScope for Riverpod state management
   runApp(
@@ -44,60 +46,9 @@ class AcademicAIApp extends StatelessWidget {
           // Cupertino automatically applies the native SF Pro font on Apple devices
         ),
       ),
-      // We now point the app to our smart traffic controller
 
-
-     //.........................................................there i have to add authwrapper for integration
-
-
-
+      // 🚦 Our smart traffic controller that handles routing
       home: const AuthWrapper(), 
-    );
-  }
-}
-
-// 🚧 Temporary screen just so you can run the app and see the theme working
-class PlaceholderBootScreen extends StatelessWidget {
-  const PlaceholderBootScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Academic AI System'),
-        backgroundColor: AppColors.surfaceElevated,
-        border: null, // Removes the bottom border for a cleaner look
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              CupertinoIcons.sparkles, // AI Brain Icon
-              size: 80,
-              color: AppColors.primary,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'System Initialized',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5, // Tighter letter spacing for iOS feel
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Awaiting Auth UI...',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

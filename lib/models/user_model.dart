@@ -1,5 +1,3 @@
-// lib/models/user_model.dart
-
 enum UserRole { student, teacher }
 
 class UserModel {
@@ -7,64 +5,43 @@ class UserModel {
   final String name;
   final String email;
   final UserRole role;
-  final String? profileImageUrl;
+  final String? avatarUrl; // 👈 Updated to match schema
   final DateTime createdAt;
+  final DateTime updatedAt; // 👈 Added to match schema
 
   UserModel({
     required this.id,
     required this.name,
     required this.email,
     required this.role,
-    this.profileImageUrl,
+    this.avatarUrl,
     required this.createdAt,
+    required this.updatedAt,
   });
 
-  // 🔄 Creates a copy of this model with optional new values (Crucial for Riverpod)
-  UserModel copyWith({
-    String? id,
-    String? name,
-    String? email,
-    UserRole? role,
-    String? profileImageUrl,
-    DateTime? createdAt,
-  }) {
-    return UserModel(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      role: role ?? this.role,
-      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
-
-  // 📤 Converts the object into a Map so we can save it to Firebase Firestore
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'name': name,
       'email': email,
-      'role': role.name, // saves 'student' or 'teacher' as a string
-      'profileImageUrl': profileImageUrl,
-      'createdAt': createdAt.toIso8601String(),
+      'role': role.name,
+      'avatar_url': avatarUrl, // 👈 Maps to DB snake_case
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
-  // 📥 Reads data from Firebase Firestore and converts it back into a UserModel object
   factory UserModel.fromMap(Map<String, dynamic> map, String documentId) {
     return UserModel(
       id: documentId,
       name: map['name'] ?? '',
       email: map['email'] ?? '',
-      // Safely parse the enum from a string
       role: UserRole.values.firstWhere(
         (e) => e.name == map['role'],
-        orElse: () => UserRole.student, // Default fallback
+        orElse: () => UserRole.student,
       ),
-      profileImageUrl: map['profileImageUrl'],
-      createdAt: map['createdAt'] != null 
-          ? DateTime.parse(map['createdAt']) 
-          : DateTime.now(),
+      avatarUrl: map['avatar_url'],
+      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at']) : DateTime.now(),
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/submission_model.dart';
 
-// Import the database service provider we already created
-import 'assignment_provider.dart'; 
+// 👇 FIXED: Pointing to the correct provider file now!
+import 'database_provider.dart'; 
 
 // 1. Stream a specific student's submissions 
 // (Used on the Student Dashboard to track their past work and grades)

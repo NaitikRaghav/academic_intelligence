@@ -1,15 +1,20 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Core
 import '../../core/constants/colors.dart';
 import '../../core/constants/typography.dart';
 
+// Providers & Services
+import '../../providers/chat_provider.dart';
+import '../../services/gemini_service.dart'; // 👈 We imported your new AI brain here!
+
 // Widgets
 import '../../widgets/cupertino_text_field.dart';
 
 class AIChatScreen extends ConsumerStatefulWidget {
-  final String assignmentId; // We pass this so the AI knows what they are talking about!
+  final String assignmentId; 
   
   const AIChatScreen({super.key, required this.assignmentId});
 
@@ -21,17 +26,6 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
-  // =========================================================================
-  // 🛑 THE FRONTEND BYPASS (Mock Chat History)
-  // =========================================================================
-  final List<Map<String, dynamic>> _messages = [
-    {
-      'isAI': true,
-      'text': 'Hello! I am Academic AI. How can I help you with this assignment today?',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 5)),
-    }
-  ];
-
   bool _isTyping = false;
 
   @override
@@ -41,43 +35,61 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
 
-    final userMessage = _messageController.text;
-    
-    // 1. Add User Message to UI
-    setState(() {
-      _messages.add({
-        'isAI': false,
-        'text': userMessage,
-        'timestamp': DateTime.now(),
-      });
-      _messageController.clear();
-      _isTyping = true;
+    // Get the active Chat ID from our Riverpod provider
+    final chatId = ref.read(chatIdProvider(widget.assignmentId)).value;
+    if (chatId == null) return;
+
+    _messageController.clear();
+    setState(() => _isTyping = true);
+
+    // 1. Insert User Message directly into Supabase
+    await Supabase.instance.client.from('messages').insert({
+      'chat_id': chatId,
+      'sender': 'user',
+      'message': text,
     });
 
     _scrollToBottom();
 
-    // 2. Simulate Gemini Network Delay (Your friend will replace this with real API)
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // 🚀 2. CALL THE REAL GEMINI API!
+      final aiResponse = await GeminiService().askChatbot(
+        studentQuestion: text,
+        // 👇 FIXED: Passing a real string instead of null to keep Null Safety happy!
+        assignmentContext: widget.assignmentId == 'general' 
+            ? 'General tutoring session' 
+            : 'Assignment ID: ${widget.assignmentId}', 
+      );
 
-    // 3. Add AI Response
-    if (mounted) {
-      setState(() {
-        _isTyping = false;
-        _messages.add({
-          'isAI': true,
-          'text': 'I am currently running in Mock Mode, but once connected to Firebase, I will analyze your request and provide a detailed, intelligent response!',
-          'timestamp': DateTime.now(),
-        });
+      // 3. Save Gemini's brilliant response to Supabase
+      await Supabase.instance.client.from('messages').insert({
+        'chat_id': chatId,
+        'sender': 'ai',
+        'message': aiResponse,
       });
+
+    } catch (e) {
+      // 👇 ADD THIS LINE TO FORCE FLUTTER TO TELL US WHAT IS WRONG
+      print('GEMINI API CRASHED: $e'); 
+      
+      // If the API fails, tell the user gracefully
+      await Supabase.instance.client.from('messages').insert({
+        'chat_id': chatId,
+        'sender': 'ai',
+        'message': 'Oops! My AI brain hit a glitch: $e',
+      });
+    } finally {
+      if (mounted) setState(() => _isTyping = false);
       _scrollToBottom();
     }
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -90,19 +102,28 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🟢 Listen to the LIVE Supabase Messages Stream
+    final messagesAsync = ref.watch(chatMessagesProvider(widget.assignmentId));
+
+    // Force scroll to bottom when new messages arrive
+    ref.listen(chatMessagesProvider(widget.assignmentId), (previous, next) {
+      if (next.hasValue && next.value!.isNotEmpty) {
+        _scrollToBottom();
+      }
+    });
+
     return CupertinoPageScaffold(
       backgroundColor: AppColors.background,
       navigationBar: CupertinoNavigationBar(
         backgroundColor: AppColors.surfaceElevated.withOpacity(0.8),
-        middle: Row(
+        middle: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.sparkles, size: 18, color: AppColors.aiAccent),
-            const SizedBox(width: 8),
-            const Text('Gemini Tutor', style: AppTypography.headline),
+            Icon(CupertinoIcons.sparkles, size: 18, color: AppColors.aiAccent),
+            SizedBox(width: 8),
+            Text('Gemini Tutor', style: AppTypography.headline),
           ],
         ),
-        // A clean back button
         previousPageTitle: 'Back',
       ),
       child: SafeArea(
@@ -110,20 +131,25 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
           children: [
             // --- CHAT MESSAGES AREA ---
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length + (_isTyping ? 1 : 0),
-                itemBuilder: (context, index) {
-                  // Show the typing indicator at the very bottom if AI is thinking
-                  if (index == _messages.length && _isTyping) {
-                    return _buildTypingIndicator();
-                  }
+              child: messagesAsync.when(
+                loading: () => const Center(child: CupertinoActivityIndicator()),
+                error: (error, stack) => Center(child: Text('Error: $error', style: const TextStyle(color: AppColors.destructive))),
+                data: (messages) {
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length + (_isTyping ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == messages.length && _isTyping) {
+                        return _buildTypingIndicator();
+                      }
 
-                  final msg = _messages[index];
-                  final isAI = msg['isAI'] as bool;
+                      final msg = messages[index];
+                      final isAI = msg.sender == 'ai';
 
-                  return _buildChatBubble(msg['text'], isAI);
+                      return _buildChatBubble(msg.message, isAI);
+                    },
+                  );
                 },
               ),
             ),
@@ -131,7 +157,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
             // --- BOTTOM INPUT AREA ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.surface,
                 border: Border(top: BorderSide(color: AppColors.divider, width: 0.5)),
               ),
@@ -175,7 +201,7 @@ class _AIChatScreenState extends ConsumerState<AIChatScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75, // Bubbles take max 75% width
+          maxWidth: MediaQuery.of(context).size.width * 0.75, 
         ),
         decoration: BoxDecoration(
           color: isAI ? AppColors.surfaceElevated : AppColors.primary,

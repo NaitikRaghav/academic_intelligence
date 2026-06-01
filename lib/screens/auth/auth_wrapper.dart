@@ -1,9 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// Core & Models
-import '../../models/user_model.dart';
-import '../../providers/mock_auth_provider.dart';
+// Providers
+import '../../providers/auth_provider.dart'; // 👈 Your real auth provider
 
 // Screens
 import 'login_screen.dart';
@@ -15,19 +14,32 @@ class AuthWrapper extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 🎧 Listen to our fake authentication state
-    final mockUser = ref.watch(mockAuthStateProvider);
+    // 🎧 Listen to the live Supabase Auth Stream
+    final authState = ref.watch(authStateProvider);
 
-    // 🛑 If nobody is logged in, show the Login Screen
-    if (mockUser == null) {
-      return const LoginScreen();
-    }
+    return authState.when(
+      // ⏳ Loading State
+      loading: () => const CupertinoPageScaffold(
+        child: Center(child: CupertinoActivityIndicator(radius: 20)),
+      ),
+      // ❌ Error State
+      error: (error, stack) => CupertinoPageScaffold(
+        child: Center(child: Text('Error: $error')),
+      ),
+      // ✅ Data State (User is either logged in or null)
+      data: (user) {
+        if (user == null) {
+          return const LoginScreen();
+        }
 
-    // 🔀 The Routing Magic
-    if (mockUser.role == UserRole.teacher) {
-      return const TeacherDashboard(); 
-    } else {
-      return const StudentDashboard();
-    }
+        // 🔀 Temporary Routing: Until we pull the 'role' from the users table,
+        // we will route based on email just to keep you unblocked!
+        if (user.email != null && user.email!.toLowerCase().contains('teacher')) {
+          return const TeacherDashboard(); 
+        } else {
+          return const StudentDashboard();
+        }
+      },
+    );
   }
 }

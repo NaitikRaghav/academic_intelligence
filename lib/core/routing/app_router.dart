@@ -3,9 +3,9 @@ import 'package:flutter/cupertino.dart';
 // Import our screens
 import '../../screens/auth/login_screen.dart';
 // We will uncomment these as we build them:
-// import '../../screens/auth/signup_screen.dart';
-// import '../../screens/student/student_dashboard.dart';
-// import '../../screens/teacher/teacher_dashboard.dart';
+import '../../screens/auth/login_screen.dart';
+import '../../screens/student/student_dashboard.dart';
+import '../../screens/teacher/teacher_dashboard.dart';
 
 class AppRoutes {
   // Define string constants for all routes to prevent typos

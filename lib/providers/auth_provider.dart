@@ -1,15 +1,33 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// 1. Expose the AuthService globally so any screen can trigger login/signup without creating new instances
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
+// 1. 🟢 Live Stream with an IMMEDIATE check
+final authStateProvider = StreamProvider<User?>((ref) async* {
+  // 👇 THE MAGIC FIX: Immediately check if someone is logged in right now
+  yield Supabase.instance.client.auth.currentUser;
+  
+  // Then listen to any future login/logout button presses
+  yield* Supabase.instance.client.auth.onAuthStateChange.map((event) => event.session?.user);
 });
 
-// 2. Stream the user's live authentication state (Logged in vs Logged out)
-// By listening to this, our app's Router can automatically switch screens securely
-final authStateProvider = StreamProvider<User?>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.authStateChanges;
-});
+// 2. 🛠️ The Auth Service 
+class AuthService {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  // Log In
+  Future<void> signIn(String email, String password) async {
+    try {
+      await _supabase.auth.signInWithPassword(email: email, password: password);
+    } catch (e) {
+      throw Exception('Login Failed: $e');
+    }
+  }
+
+  // Log Out 
+  Future<void> signOut() async {
+    await _supabase.auth.signOut();
+  }
+}
+
+// 3. Expose the service to the rest of the app
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());

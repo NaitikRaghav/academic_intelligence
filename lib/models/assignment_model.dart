@@ -1,52 +1,59 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-// 👇 ADD THIS ENUM RIGHT HERE 👇
-enum DifficultyLevel {
-  beginner,
-  intermediate,
-  advanced
-}
+enum DifficultyLevel { beginner, intermediate, advanced }
+
 class AssignmentModel {
   final String id;
-  final String teacherId;
   final String title;
-  final String description;
-  final DateTime dueDate;
-  final bool aiGenerated; // The badge we just built!
+  final String? subject;
+  final String? topic;
+  final DifficultyLevel? difficulty;
+  final String generatedContent; 
+  final String createdBy;        
+  final DateTime? deadline;      
+  final double maxScore;
   final DateTime createdAt;
 
   AssignmentModel({
     required this.id,
-    required this.teacherId,
     required this.title,
-    required this.description,
-    required this.dueDate,
-    required this.aiGenerated,
+    this.subject,
+    this.topic,
+    this.difficulty,
+    required this.generatedContent,
+    required this.createdBy,
+    this.deadline,
+    this.maxScore = 10.0,
     required this.createdAt,
   });
 
-  // 📤 Converts our Dart Object into a JSON Map for Firebase
   Map<String, dynamic> toMap() {
     return {
-      'teacherId': teacherId,
       'title': title,
-      'description': description,
-      'dueDate': Timestamp.fromDate(dueDate),
-      'aiGenerated': aiGenerated,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'subject': subject,
+      'topic': topic,
+      'difficulty': difficulty?.name,
+      'generated_content': generatedContent,
+      'created_by': createdBy,
+      'deadline': deadline?.toIso8601String(),
+      // 👇 FIXED: We commented this out so it doesn't crash Supabase!
+      // 'max_score': maxScore, 
+      'created_at': createdAt.toIso8601String(),
     };
   }
 
-  // 📥 Converts a Firebase JSON Map back into our Dart Object
   factory AssignmentModel.fromMap(Map<String, dynamic> map, String documentId) {
     return AssignmentModel(
       id: documentId,
-      teacherId: map['teacherId'] ?? '',
-      title: map['title'] ?? 'Untitled Assignment',
-      description: map['description'] ?? '',
-      // Firebase stores dates as Timestamps, so we convert them back to DateTimes
-      dueDate: (map['dueDate'] as Timestamp).toDate(),
-      aiGenerated: map['aiGenerated'] ?? false,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      title: map['title'] ?? 'Untitled',
+      subject: map['subject'],
+      topic: map['topic'],
+      difficulty: map['difficulty'] != null 
+          ? DifficultyLevel.values.firstWhere((e) => e.name == map['difficulty'], orElse: () => DifficultyLevel.intermediate)
+          : null,
+      generatedContent: map['generated_content'] ?? '',
+      createdBy: map['created_by'] ?? '',
+      deadline: map['deadline'] != null ? DateTime.parse(map['deadline']) : null,
+      maxScore: (map['max_score'] ?? 10).toDouble(),
+      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
     );
   }
 }

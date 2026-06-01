@@ -9,7 +9,7 @@ class GeminiService {
 
   GeminiService() {
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       apiKey: ApiKeys.geminiApiKey,
       // 🛡️ Enforcing JSON output so our app doesn't break trying to parse text
       generationConfig: GenerationConfig(
@@ -104,7 +104,7 @@ class GeminiService {
   }) async {
     // For the chatbot, we want standard markdown text, not JSON
     final chatModel = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       apiKey: ApiKeys.geminiApiKey,
     );
 
@@ -125,6 +125,47 @@ class GeminiService {
       return response.text ?? "I'm sorry, I couldn't process that right now.";
     } catch (e) {
       throw Exception('Chatbot error: $e');
+    }
+    
+  }
+  // --- 🎯 4. QUIZ GENERATOR ---
+
+  Future<Map<String, dynamic>> generateQuiz({
+    required String subject,
+    required String topic,
+    required DifficultyLevel difficulty,
+    int numberOfQuestions = 5,
+  }) async {
+    final prompt = '''
+      You are an expert academic professor. Create a multiple-choice quiz for the subject "$subject" 
+      focusing on the topic "$topic". The difficulty level is ${difficulty.name}.
+      Generate exactly $numberOfQuestions questions.
+      
+      You MUST return your response as a valid JSON object with the exact following structure:
+      {
+        "title": "A catchy title for the quiz",
+        "questions": [
+          {
+            "question": "The question text...",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct_answer": "The exact string of the correct option",
+            "explanation": "A short explanation of why this is correct."
+          }
+        ]
+      }
+    ''';
+
+    try {
+      final response = await _model.generateContent([Content.text(prompt)]);
+      final rawText = response.text;
+
+      if (rawText != null) {
+        return jsonDecode(rawText) as Map<String, dynamic>;
+      } else {
+        throw Exception("AI returned an empty quiz response.");
+      }
+    } catch (e) {
+      throw Exception('Failed to generate quiz: $e');
     }
   }
 }
